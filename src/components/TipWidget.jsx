@@ -1,0 +1,192 @@
+import React, { useState } from 'react';
+import { Send, Sparkles, CheckCircle2, AlertCircle, Coins, Coffee } from 'lucide-react';
+
+export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onConnectWallet }) {
+  const [selectedPreset, setSelectedPreset] = useState('0.005');
+  const [customAmount, setCustomAmount] = useState('');
+  const [supporterName, setSupporterName] = useState('');
+  const [message, setMessage] = useState('');
+  const [txSuccessMsg, setTxSuccessMsg] = useState(null);
+  const [txErrorMsg, setTxErrorMsg] = useState(null);
+
+  const presets = [
+    { eth: '0.001', label: '0.001 ETH', desc: '☕ Quick Coffee Tip' },
+    { eth: '0.005', label: '0.005 ETH', desc: '🚌 Bus Supporter' },
+    { eth: '0.01', label: '0.01 ETH', desc: '⚡ Champion Sponsor' },
+    { eth: 'custom', label: 'Custom', desc: '✨ Pick Amount' }
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setTxSuccessMsg(null);
+    setTxErrorMsg(null);
+
+    const ethValue = selectedPreset === 'custom' ? customAmount : selectedPreset;
+    if (!ethValue || parseFloat(ethValue) <= 0) {
+      setTxErrorMsg('Please select or enter a valid ETH tip amount.');
+      return;
+    }
+
+    try {
+      const result = await onSendTip({
+        amountEth: ethValue,
+        name: supporterName.trim() || 'Anonymous Commuter',
+        message: message.trim() || 'Thank you Ifeoma for keeping city transit accessible!'
+      });
+
+      if (result && result.success) {
+        setTxSuccessMsg(`🎉 Success! Your tip of ${ethValue} ETH was sent directly to Ifeoma's wallet & added to the Praise Wall!`);
+        setMessage('');
+        setSupporterName('');
+      }
+    } catch (err) {
+      setTxErrorMsg(err.message || 'Transaction failed. Please try again.');
+    }
+  };
+
+  return (
+    <section id="tip-widget" style={{ padding: '3rem 1.5rem', background: '#EAE6DB', borderBottom: '3px solid #121212', position: 'relative' }}>
+      
+      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <span className="brutal-badge brutal-card-yellow" style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>DIRECT WEB3 TRANSFERS</span>
+          <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)' }}>SEND A TIP & JOIN THE WALL</h2>
+          <p className="handwritten" style={{ fontSize: '1.25rem', color: '#121212', marginTop: '0.25rem' }}>
+            100% of your ETH goes straight to Ifeoma's wallet address.
+          </p>
+        </div>
+
+        {/* Neo-brutalist Main Tip Card */}
+        <div className="brutal-card brutal-card-yellow" style={{ padding: '2rem', position: 'relative' }}>
+          
+          <form onSubmit={handleSubmit}>
+            
+            {/* Step 1: Select Preset */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.75rem', fontSize: '0.95rem' }}>
+                1. Select Tip Amount (ETH)
+              </label>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem' }}>
+                {presets.map((preset) => {
+                  const isSelected = selectedPreset === preset.eth;
+                  return (
+                    <button
+                      key={preset.eth}
+                      type="button"
+                      onClick={() => setSelectedPreset(preset.eth)}
+                      className="brutal-card"
+                      style={{
+                        padding: '1rem',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        background: isSelected ? '#121212' : '#FFFFFF',
+                        color: isSelected ? '#FFFFFF' : '#121212',
+                        border: '3px solid #121212',
+                        boxShadow: isSelected ? '4px 4px 0px #FF7E67' : '3px 3px 0px #121212',
+                        transform: isSelected ? 'translate(-2px, -2px)' : 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ fontWeight: 900, fontSize: '1.15rem' }}>{preset.label}</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.9, marginTop: '0.2rem', fontWeight: 600 }}>{preset.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedPreset === 'custom' && (
+                <div style={{ marginTop: '1rem' }}>
+                  <input
+                    type="number"
+                    step="0.0001"
+                    placeholder="Enter custom ETH amount (e.g. 0.008)"
+                    value={customAmount}
+                    onChange={(e) => setCustomAmount(e.target.value)}
+                    className="brutal-input"
+                    required
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Supporter Name & Note */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                  2. Your Name / Alias (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Kwame B. (Route 42 Commuter)"
+                  value={supporterName}
+                  onChange={(e) => setSupporterName(e.target.value)}
+                  className="brutal-input"
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                  3. Note / Message to Ifeoma
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Thanks for saving my morning commute!"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="brutal-input"
+                />
+              </div>
+            </div>
+
+            {/* Success / Error Banners */}
+            {txSuccessMsg && (
+              <div className="brutal-card brutal-card-teal" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <CheckCircle2 size={24} />
+                <div>{txSuccessMsg}</div>
+              </div>
+            )}
+
+            {txErrorMsg && (
+              <div className="brutal-card brutal-card-coral" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <AlertCircle size={24} />
+                <div>{txErrorMsg}</div>
+              </div>
+            )}
+
+            {/* Submit / Connect Wallet Action */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', borderTop: '2px dashed #121212', paddingTop: '1.25rem' }}>
+              
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Coins size={18} />
+                <span>Recipient Wallet: <code>0x7099...79C8</code> (Ifeoma's Direct Address)</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="brutal-btn brutal-btn-blue"
+                style={{ fontSize: '1.05rem', padding: '0.85rem 2rem' }}
+              >
+                {isSubmitting ? (
+                  <span>Processing Web3 Tx...</span>
+                ) : (
+                  <>
+                    <Send size={18} />
+                    <span>Send {selectedPreset === 'custom' ? (customAmount || '0') : selectedPreset} ETH Tip</span>
+                  </>
+                )}
+              </button>
+
+            </div>
+
+          </form>
+
+        </div>
+
+      </div>
+
+    </section>
+  );
+}

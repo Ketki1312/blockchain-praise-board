@@ -1,0 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800;900&family=Space+Grotesk:wght@600;700&family=Architects+Daughter&display=swap');
+
+:root {
+  --bg-canvas: #F5F2EB;
+  --bg-canvas-pattern: #EAE6DB;
+  --dark-black: #121212;
+  --accent-yellow: #FFD05B;
+  --accent-blue: #A3C7FF;
+  --accent-purple: #B8A1D9;
+  --accent-coral: #FF7E67;
+  --accent-teal: #65CBE2;
+  --accent-mint: #70E2B8;
+  --card-white: #FFFFFF;
+  --border-thick: 3px solid #121212;
+  --shadow-hard: 5px 5px 0px #121212;
+  --shadow-hard-lg: 8px 8px 0px #121212;
+  --shadow-hard-sm: 3px 3px 0px #121212;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-canvas);
+  background-image: 
+    radial-gradient(var(--dark-black) 0.75px, transparent 0.75px), 
+    linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 24px 24px, 48px 48px, 48px 48px;
+  color: var(--dark-black);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.5;
+}
+
+/* Neo-Brutalist Typography */
+h1, h2, h3, h4, .font-heading {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--dark-black);
+}
+
+.handwritten {
+  font-family: 'Architects Daughter', cursive;
+  text-transform: none;
+  font-weight: bold;
+}
+
+/* Brutalist UI Components */
+.brutal-card {
+  background: var(--card-white);
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard);
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.brutal-card-yellow {
+  background: var(--accent-yellow);
+}
+
+.brutal-card-blue {
+  background: var(--accent-blue);
+}
+
+.brutal-card-purple {
+  background: var(--accent-purple);
+}
+
+.brutal-card-coral {
+  background: var(--accent-coral);
+}
+
+.brutal-card-teal {
+  background: var(--accent-teal);
+}
+
+.brutal-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.75rem 1.5rem;
+  border: var(--border-thick);
+  box-shadow: var(--shadow-hard-sm);
+  background: var(--dark-black);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.1s ease;
+  user-select: none;
+}
+
+.brutal-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-hard);
+}
+
+.brutal-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px #121212;
+}
+
+.brutal-btn-yellow {
+  background: var(--accent-yellow);
+  color: var(--dark-black);
+}
+
+.brutal-btn-blue {
+  background: var(--accent-blue);
+  color: var(--dark-black);
+}
+
+.brutal-btn-coral {
+  background: var(--accent-coral);
+  color: var(--dark-black);
+}
+
+.brutal-input {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: var(--border-thick);
+  background: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dark-black);
+  box-shadow: var(--shadow-hard-sm);
+  outline: none;
+  font-family: inherit;
+}
+
+.brutal-input:focus {
+  background: #fffdf5;
+  box-shadow: var(--shadow-hard);
+}
+
+.brutal-badge {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border: 2px solid #121212;
+  box-shadow: 2px 2px 0px #121212;
+  display: inline-block;
+}
+
+/* Graphic Overlay Decorative Assets */
+.starburst {
+  font-size: 2.5rem;
+  font-weight: 900;
+  line-height: 1;
+  user-select: none;
+}
+
+.plus-crosshair {
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--dark-black);
+}
+
+.tape-strip {
+  width: 90px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px dashed rgba(0,0,0,0.25);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  z-index: 10;
+}
+
+/* Dashed Route Path Animation */
+.dashed-path {
+  stroke-dasharray: 8 8;
+  animation: dash 30s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+/* Sticky Note Tilt */
+.tilt-left {
+  transform: rotate(-1.8deg);
+}
+
+.tilt-right {
+  transform: rotate(1.8deg);
+}
+
+.tilt-left:hover, .tilt-right:hover {
+  transform: rotate(0deg) scale(1.01);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-canvas);
+  border-left: 2px solid #121212;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--dark-black);
+}
