@@ -28,6 +28,18 @@ For over three years, Ifeoma has maintained her city's bus timetables online out
 
 ---
 
+## 📸 Interface Previews
+
+| Hero Section | Direct Web3 Tipping Widget |
+| :---: | :---: |
+| ![Hero Section](screenshots/hero_landing.png) | ![Tip Widget](screenshots/tip_widget.png) |
+
+| Live Supporter Wall | Footer & Project Info |
+| :---: | :---: |
+| ![Supporter Wall](screenshots/supporter_wall.png) | ![Footer Section](screenshots/footer_section.png) |
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Smart Contract**: Solidity (`^0.8.20`), Hardhat
