@@ -34,16 +34,28 @@ describe("PraiseBoard", function () {
     const tips = await praiseBoard.getAllTips();
     expect(tips.length).to.equal(1);
     expect(tips[0].name).to.equal("Kwame B.");
-    expect(tips[0].message).to.equal("Thanks for keeping route 42 accurate!");
+    expect(tips[0].note).to.equal("Thanks for keeping route 42 accurate!");
     expect(tips[0].amount).to.equal(tipAmount);
     expect(tips[0].sender).to.equal(commuter1.address);
   });
 
-  it("Should emit NewTip event when a tip is sent", async function () {
+  it("Should emit NewTip event with note, msg.sender, and msg.value", async function () {
     const tipAmount = hre.ethers.parseEther("0.005");
     await expect(praiseBoard.connect(commuter2).sendTip("Nneka O.", "You saved my morning commute!", { value: tipAmount }))
       .to.emit(praiseBoard, "NewTip")
       .withArgs(commuter2.address, "Nneka O.", "You saved my morning commute!", tipAmount, (val) => val > 0);
+  });
+
+  it("Should enforce note length bound in contract", async function () {
+    const tipAmount = hre.ethers.parseEther("0.001");
+    const tooLongNote = "a".repeat(281);
+    await expect(praiseBoard.connect(commuter1).sendTip("Tester", tooLongNote, { value: tipAmount }))
+      .to.be.revertedWithCustomError(praiseBoard, "NoteTooLong");
+  });
+
+  it("Should restrict withdraw function strictly to owner", async function () {
+    await expect(praiseBoard.connect(commuter1).withdraw())
+      .to.be.revertedWithCustomError(praiseBoard, "OnlyOwner");
   });
 
   it("Should revert if tip amount is zero", async function () {

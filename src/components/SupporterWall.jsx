@@ -155,9 +155,21 @@ export default function SupporterWall({ tips }) {
                       {tip.timeAgo || 'Just now'}
                     </span>
 
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#008000' }}>
-                      <UserCheck size={13} /> On-Chain Verified
-                    </span>
+                    {tip.transactionHash ? (
+                      <a
+                        href={`https://sepolia.etherscan.io/tx/${tip.transactionHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#008000', textDecoration: 'underline' }}
+                        title="View verified log transaction on Sepolia Etherscan"
+                      >
+                        <UserCheck size={13} /> On-Chain Log <ArrowUpRight size={12} />
+                      </a>
+                    ) : (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#008000' }}>
+                        <UserCheck size={13} /> On-Chain Verified
+                      </span>
+                    )}
                   </div>
 
                 </div>

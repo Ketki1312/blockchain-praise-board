@@ -6,133 +6,179 @@ import TipWidget from './components/TipWidget.jsx';
 import SupporterWall from './components/SupporterWall.jsx';
 import Footer from './components/Footer.jsx';
 
-// Import deployment ABI if compiled
 import deploymentData from './contracts/deployment.json';
 
 const CONTRACT_ABI = [
-  "function sendTip(string memory _name, string memory _message) external payable",
-  "function getAllTips() external view returns (tuple(address sender, string name, string message, uint256 amount, uint256 timestamp)[])",
+  "function sendTip(string memory _name, string memory _note) external payable",
+  "function withdraw() external",
+  "function getAllTips() external view returns (tuple(address sender, string name, string note, uint256 amount, uint256 timestamp)[])",
   "function getTipCount() external view returns (uint256)",
   "function owner() external view returns (address)",
-  "event NewTip(address indexed sender, string name, string message, uint256 amount, uint256 timestamp)"
+  "event NewTip(address indexed sender, string name, string note, uint256 amount, uint256 timestamp)"
 ];
 
-// Initial mock supporters so the Praise Wall is populated out-of-the-box
-const INITIAL_SUPPORTERS = [
-  {
-    sender: "0x8626f69A4512D1031664694C765103E7c8651817",
-    name: "Kwame B.",
-    message: "Route 42 daily commuter here. Ifeoma, your site saves me from being late every single week!",
-    amountEth: "0.01",
-    timestamp: Date.now() - 3600000 * 2,
-    timeAgo: "2 hours ago"
-  },
-  {
-    sender: "0x3C44CdD070923F3e83803d979917093e140c5A1C",
-    name: "Amina M.",
-    message: "Happy to chip in! Central Station bus schedules are never posted anywhere else.",
-    amountEth: "0.005",
-    timestamp: Date.now() - 3600000 * 5,
-    timeAgo: "5 hours ago"
-  },
-  {
-    sender: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    name: "Tunde O.",
-    message: "Sending tips via crypto with zero platform fees is brilliant. Keep it up!",
-    amountEth: "0.015",
-    timestamp: Date.now() - 3600000 * 12,
-    timeAgo: "12 hours ago"
-  },
-  {
-    sender: "0x15d34AA545384893178696F6f9F2a66e4e5E7c79",
-    name: "Bus Line 14 Commuters",
-    message: "Group tip from our morning bus pool. Thank you Ifeoma!",
-    amountEth: "0.02",
-    timestamp: Date.now() - 3600000 * 24,
-    timeAgo: "1 day ago"
-  },
-  {
-    sender: "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-    name: "Chidi N.",
-    message: "No middleman taking 20%? Instant transaction straight to creator. Perfect.",
-    amountEth: "0.005",
-    timestamp: Date.now() - 3600000 * 36,
-    timeAgo: "1.5 days ago"
-  }
-];
+const SEPOLIA_CHAIN_ID_HEX = "0xaa36a7"; // 11155111 in hex
+
+/**
+ * Helper to identify if an error is a user-rejected wallet prompt (Test Case 8)
+ */
+export function isUserRejection(err) {
+  if (!err) return false;
+  const code = err.code || err?.info?.error?.code || err?.cause?.code || err?.error?.code;
+  const msg = (err.message || err?.info?.error?.message || '').toLowerCase();
+  return (
+    code === 4001 ||
+    code === 'ACTION_REJECTED' ||
+    msg.includes('user rejected') ||
+    msg.includes('user denied') ||
+    msg.includes('declined') ||
+    msg.includes('rejected transaction') ||
+    msg.includes('action_rejected')
+  );
+}
 
 export default function App() {
   const [walletAddress, setWalletAddress] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tips, setTips] = useState(INITIAL_SUPPORTERS);
+  const [tips, setTips] = useState([]);
   const [contract, setContract] = useState(null);
+  const [provider, setProvider] = useState(null);
+  const [chainId, setChainId] = useState(null);
+  const [networkName, setNetworkName] = useState('');
+  const [isOwner, setIsOwner] = useState(false);
+  const [contractBalance, setContractBalance] = useState('0');
+  const [withdrawMsg, setWithdrawMsg] = useState(null);
 
-  // Calculate totals
+  // Calculate totals from event log populated state
   const totalRaised = tips.reduce((acc, curr) => acc + parseFloat(curr.amountEth || 0), 0).toFixed(3);
   const tipCount = tips.length;
+
+  /**
+   * Test Case 1: Populate supporter wall exclusively from decoded contract event logs
+   */
+  const fetchEventLogs = async (praiseContract) => {
+    try {
+      const filter = praiseContract.filters.NewTip();
+      const eventLogs = await praiseContract.queryFilter(filter, 0, "latest");
+      
+      const decodedEntries = eventLogs.map((log) => {
+        // Log args carry: sender, name, note, amount, timestamp
+        const { sender, name, note, amount, timestamp } = log.args || {};
+        const parsedAmount = amount ? ethers.formatEther(amount) : "0";
+        const parsedNote = note || "Thank you Ifeoma for keeping city transit accessible!";
+
+        return {
+          sender: sender,
+          name: name || "Anonymous Supporter",
+          note: parsedNote,
+          message: parsedNote,
+          amountEth: parsedAmount,
+          timestamp: Number(timestamp || 0) * 1000,
+          blockNumber: log.blockNumber,
+          transactionHash: log.transactionHash,
+          timeAgo: "Verified On-Chain Log"
+        };
+      });
+
+      // Show newest on-chain event logs first
+      setTips(decodedEntries.reverse());
+    } catch (err) {
+      console.warn("Error decoding contract event logs:", err);
+    }
+  };
 
   // Initialize Web3 Connection
   useEffect(() => {
     async function checkConnectedWallet() {
       if (window.ethereum) {
         try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-          const accounts = await provider.send('eth_accounts', []);
+          const web3Provider = new ethers.BrowserProvider(window.ethereum);
+          setProvider(web3Provider);
+
+          const network = await web3Provider.getNetwork();
+          setChainId(Number(network.chainId));
+          setNetworkName(network.name === 'unknown' ? 'Local/Sepolia' : network.name);
+
+          const accounts = await web3Provider.send('eth_accounts', []);
           if (accounts.length > 0) {
             setWalletAddress(accounts[0]);
-            initContract(provider);
+            await initContract(web3Provider, accounts[0]);
+          }
+
+          // Listen for network & account changes
+          if (window.ethereum.on) {
+            window.ethereum.on('chainChanged', () => window.location.reload());
+            window.ethereum.on('accountsChanged', (newAccounts) => {
+              if (newAccounts.length > 0) {
+                setWalletAddress(newAccounts[0]);
+                initContract(web3Provider, newAccounts[0]);
+              } else {
+                setWalletAddress('');
+              }
+            });
           }
         } catch (err) {
-          console.warn("Ethereum check error:", err);
+          console.warn("Ethereum provider check error:", err);
         }
       }
     }
     checkConnectedWallet();
   }, []);
 
-  const initContract = async (provider) => {
+  const initContract = async (web3Provider, userAddr) => {
     try {
       const contractAddr = deploymentData ? deploymentData.address : "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-      const signer = await provider.getSigner();
+      const signer = await web3Provider.getSigner();
       const praiseContract = new ethers.Contract(contractAddr, CONTRACT_ABI, signer);
       setContract(praiseContract);
 
-      // Try fetching on-chain tips
+      // Check owner status
       try {
-        const onChainTips = await praiseContract.getAllTips();
-        if (onChainTips && onChainTips.length > 0) {
-          const formatted = onChainTips.map((t) => ({
-            sender: t.sender,
-            name: t.name,
-            message: t.message,
-            amountEth: ethers.formatEther(t.amount),
-            timestamp: Number(t.timestamp) * 1000,
-            timeAgo: "On-Chain"
-          }));
-          setTips([...formatted, ...INITIAL_SUPPORTERS]);
+        const ownerAddr = await praiseContract.owner();
+        if (userAddr && ownerAddr && userAddr.toLowerCase() === ownerAddr.toLowerCase()) {
+          setIsOwner(true);
+        } else {
+          setIsOwner(false);
         }
+        
+        // Fetch contract balance
+        const balanceWei = await web3Provider.getBalance(contractAddr);
+        setContractBalance(ethers.formatEther(balanceWei));
       } catch (e) {
-        console.warn("No active on-chain contract found at address, using live demo state:", e);
+        console.warn("Could not check contract owner/balance:", e);
       }
+
+      // Populate supporter wall from decoded event logs
+      await fetchEventLogs(praiseContract);
+
+      // Listen for real-time NewTip events and reconcile wall
+      praiseContract.on("NewTip", async () => {
+        await fetchEventLogs(praiseContract);
+        if (web3Provider) {
+          const balanceWei = await web3Provider.getBalance(contractAddr);
+          setContractBalance(ethers.formatEther(balanceWei));
+        }
+      });
     } catch (err) {
-      console.warn("Contract init fallback:", err);
+      console.warn("Contract initialization error:", err);
     }
   };
 
   const handleConnectWallet = async () => {
     if (!window.ethereum) {
-      // Demo simulated wallet connection if MetaMask is not installed
-      setWalletAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F");
+      alert("Please install MetaMask or a Web3 browser extension to connect your wallet.");
       return;
     }
     try {
       setIsConnecting(true);
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.send("eth_requestAccounts", []);
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      setProvider(web3Provider);
+      
+      const accounts = await web3Provider.send("eth_requestAccounts", []);
       if (accounts.length > 0) {
         setWalletAddress(accounts[0]);
-        await initContract(provider);
+        await initContract(web3Provider, accounts[0]);
       }
     } catch (err) {
       console.error("Wallet connection error:", err);
@@ -141,44 +187,120 @@ export default function App() {
     }
   };
 
-  const handleSendTip = async ({ amountEth, name, message }) => {
+  const switchNetworkToSepolia = async () => {
+    if (!window.ethereum) return;
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: SEPOLIA_CHAIN_ID_HEX }]
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: SEPOLIA_CHAIN_ID_HEX,
+              chainName: 'Sepolia Test Network',
+              nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+              rpcUrls: ['https://rpc.sepolia.org'],
+              blockExplorerUrls: ['https://sepolia.etherscan.io']
+            }]
+          });
+        } catch (addError) {
+          console.error("Failed to add Sepolia network:", addError);
+        }
+      }
+    }
+  };
+
+  /**
+   * Test Cases 2, 8 & 9:
+   * - Enforces note length check before send
+   * - Identifies user prompt rejection in its own branch (Test Case 8)
+   * - Inspects transaction receipt status (Test Case 9)
+   * - Reconciles supporter wall from decoded logs rather than standing in for it (Test Case 1)
+   */
+  const handleSendTip = async ({ amountEth, name, note }) => {
     setIsSubmitting(true);
     try {
-      if (window.ethereum && contract && walletAddress) {
-        // Real Web3 execution
-        const tx = await contract.sendTip(name, message, {
-          value: ethers.parseEther(amountEth)
-        });
-        await tx.wait();
+      if (!contract) {
+        throw new Error("Wallet not connected or contract not initialized.");
       }
 
-      // Add to live state for immediate visual feedback
-      const newTipObj = {
-        sender: walletAddress || "0x" + Math.random().toString(16).substring(2, 10) + "...3F9A",
-        name: name || "Anonymous Commuter",
-        message: message || "Direct Tip",
-        amountEth: amountEth,
-        timestamp: Date.now(),
-        timeAgo: "Just now"
+      // Test Case 2 client-side pre-validation matching contract bound (max 280 chars)
+      if (note && note.length > 280) {
+        return {
+          success: false,
+          errorType: 'NOTE_TOO_LONG',
+          message: "Note exceeds contract maximum length bound of 280 characters."
+        };
+      }
+
+      // Send transaction
+      const tx = await contract.sendTip(name || "Anonymous Supporter", note || "Thank you Ifeoma!", {
+        value: ethers.parseEther(amountEth)
+      });
+
+      // Test Case 9: Inspect receipt status after transaction resolves
+      const receipt = await tx.wait();
+      const status = receipt ? Number(receipt.status) : 0;
+
+      if (status !== 1) {
+        // Reverted transaction branch
+        return {
+          success: false,
+          reverted: true,
+          message: `Transaction reverted on-chain (receipt status ${status}). Tip was not processed.`
+        };
+      }
+
+      // Successful transaction branch: decode logs to reconcile wall
+      await fetchEventLogs(contract);
+
+      return {
+        success: true,
+        receipt: receipt,
+        message: `🎉 Success! Tip of ${amountEth} ETH confirmed on-chain!`
       };
 
-      setTips((prev) => [newTipObj, ...prev]);
-      return { success: true };
     } catch (err) {
       console.error("Send tip error:", err);
-      // Fallback: still add to local state in demo mode
-      const newTipObj = {
-        sender: walletAddress || "0x98A1...42B9",
-        name: name || "Anonymous Commuter",
-        message: message || "Direct Tip",
-        amountEth: amountEth,
-        timestamp: Date.now(),
-        timeAgo: "Just now"
+
+      // Test Case 8: Dedicated branch for rejected wallet prompt
+      if (isUserRejection(err)) {
+        return {
+          success: false,
+          rejected: true,
+          message: "Wallet Prompt Declined: You cancelled the transaction prompt in your wallet."
+        };
+      }
+
+      return {
+        success: false,
+        error: err,
+        message: err.reason || err.message || "Transaction failed."
       };
-      setTips((prev) => [newTipObj, ...prev]);
-      return { success: true };
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!contract || !isOwner) return;
+    try {
+      const tx = await contract.withdraw();
+      const receipt = await tx.wait();
+      if (receipt.status === 1) {
+        setWithdrawMsg("Successfully withdrew accumulated balance to Ifeoma's wallet!");
+        if (provider) {
+          const balanceWei = await provider.getBalance(contract.target || contract.address);
+          setContractBalance(ethers.formatEther(balanceWei));
+        }
+      }
+    } catch (err) {
+      console.error("Withdraw error:", err);
+      setWithdrawMsg(`Withdraw failed: ${err.message}`);
     }
   };
 
@@ -195,7 +317,32 @@ export default function App() {
         onConnect={handleConnectWallet} 
         totalRaised={totalRaised}
         tipCount={tipCount}
+        chainId={chainId}
+        networkName={networkName}
+        onSwitchNetwork={switchNetworkToSepolia}
       />
+
+      {/* Owner Dashboard Banner if Ifeoma is connected */}
+      {isOwner && (
+        <div style={{ background: '#FFD05B', borderBottom: '3px solid #121212', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+            👑 Owner Mode Active: You are connected as Ifeoma (Contract Owner). Contract Balance: <strong>{contractBalance} ETH</strong>
+          </div>
+          <button 
+            onClick={handleWithdraw} 
+            className="brutal-btn brutal-btn-blue" 
+            style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+          >
+            Withdraw Balance ({contractBalance} ETH)
+          </button>
+        </div>
+      )}
+
+      {withdrawMsg && (
+        <div style={{ background: '#A3C7FF', borderBottom: '3px solid #121212', padding: '0.5rem 1.5rem', fontWeight: 700, fontSize: '0.85rem', textAlign: 'center' }}>
+          {withdrawMsg}
+        </div>
+      )}
 
       <main style={{ flexGrow: 1 }}>
         <Hero onTipClick={scrollToTip} />
@@ -204,6 +351,8 @@ export default function App() {
           isSubmitting={isSubmitting}
           walletAddress={walletAddress}
           onConnectWallet={handleConnectWallet}
+          chainId={chainId}
+          onSwitchNetwork={switchNetworkToSepolia}
         />
         <SupporterWall tips={tips} />
       </main>
@@ -212,3 +361,4 @@ export default function App() {
     </div>
   );
 }
+

@@ -1,25 +1,30 @@
 import React, { useState } from 'react';
-import { Send, Sparkles, CheckCircle2, AlertCircle, Coins, Coffee } from 'lucide-react';
+import { Send, CheckCircle2, AlertCircle, Coins, AlertTriangle, ExternalLink, HelpCircle } from 'lucide-react';
 
-export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onConnectWallet }) {
+export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onConnectWallet, chainId, onSwitchNetwork }) {
   const [selectedPreset, setSelectedPreset] = useState('0.005');
   const [customAmount, setCustomAmount] = useState('');
   const [supporterName, setSupporterName] = useState('');
-  const [message, setMessage] = useState('');
+  const [note, setNote] = useState('');
   const [txSuccessMsg, setTxSuccessMsg] = useState(null);
   const [txErrorMsg, setTxErrorMsg] = useState(null);
+  const [promptRejectedMsg, setPromptRejectedMsg] = useState(null);
+  const [showFaucetHelp, setShowFaucetHelp] = useState(false);
 
   const presets = [
-    { eth: '0.001', label: '0.001 ETH', desc: '☕ Quick Coffee Tip' },
-    { eth: '0.005', label: '0.005 ETH', desc: '🚌 Bus Supporter' },
-    { eth: '0.01', label: '0.01 ETH', desc: '⚡ Champion Sponsor' },
+    { eth: '0.001', label: '0.001 ETH', desc: '☕ Quick Coffee Tip (~$3)' },
+    { eth: '0.005', label: '0.005 ETH', desc: '🚌 Bus Supporter (~$15)' },
+    { eth: '0.01', label: '0.01 ETH', desc: '⚡ Champion Sponsor (~$30)' },
     { eth: 'custom', label: 'Custom', desc: '✨ Pick Amount' }
   ];
+
+  const isWrongNetwork = walletAddress && chainId && (chainId !== 11155111 && chainId !== 31337);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setTxSuccessMsg(null);
     setTxErrorMsg(null);
+    setPromptRejectedMsg(null);
 
     const ethValue = selectedPreset === 'custom' ? customAmount : selectedPreset;
     if (!ethValue || parseFloat(ethValue) <= 0) {
@@ -27,17 +32,30 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
       return;
     }
 
+    if (note.length > 280) {
+      setTxErrorMsg('Note is too long! The contract enforces a maximum of 280 characters.');
+      return;
+    }
+
     try {
       const result = await onSendTip({
         amountEth: ethValue,
-        name: supporterName.trim() || 'Anonymous Commuter',
-        message: message.trim() || 'Thank you Ifeoma for keeping city transit accessible!'
+        name: supporterName.trim() || 'Anonymous Supporter',
+        note: note.trim() || 'Thank you Ifeoma for keeping city transit accessible!'
       });
 
       if (result && result.success) {
-        setTxSuccessMsg(`🎉 Success! Your tip of ${ethValue} ETH was sent directly to Ifeoma's wallet & added to the Praise Wall!`);
-        setMessage('');
+        setTxSuccessMsg(result.message || `🎉 Success! Your tip was confirmed on-chain and added to the Praise Wall!`);
+        setNote('');
         setSupporterName('');
+      } else if (result && result.rejected) {
+        // Test Case 8: Explicit user prompt rejection branch
+        setPromptRejectedMsg(result.message || "Wallet Prompt Declined: Transaction was cancelled in your wallet.");
+      } else if (result && result.reverted) {
+        // Test Case 9: Explicit transaction revert branch
+        setTxErrorMsg(result.message || "Transaction reverted on-chain. Tip was not processed.");
+      } else if (result && result.message) {
+        setTxErrorMsg(result.message);
       }
     } catch (err) {
       setTxErrorMsg(err.message || 'Transaction failed. Please try again.');
@@ -60,6 +78,45 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
         {/* Neo-brutalist Main Tip Card */}
         <div className="brutal-card brutal-card-yellow" style={{ padding: '2rem', position: 'relative' }}>
           
+          {/* Wrong Network Warning Banner */}
+          {isWrongNetwork && (
+            <div className="brutal-card brutal-card-coral" style={{ padding: '1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}>
+                <AlertTriangle size={20} />
+                <span>Wrong Network Detected! Connect to Sepolia Testnet to send a tip.</span>
+              </div>
+              <button
+                type="button"
+                onClick={onSwitchNetwork}
+                className="brutal-btn brutal-btn-yellow"
+                style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}
+              >
+                Switch to Sepolia Network
+              </button>
+            </div>
+          )}
+
+          {/* Testnet Faucet Assistance Banner */}
+          <div style={{ marginBottom: '1.25rem', textAlign: 'right' }}>
+            <button
+              type="button"
+              onClick={() => setShowFaucetHelp(!showFaucetHelp)}
+              style={{ background: 'none', border: 'none', textDecoration: 'underline', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+            >
+              <HelpCircle size={15} /> Need Sepolia Testnet ETH?
+            </button>
+          </div>
+
+          {showFaucetHelp && (
+            <div className="brutal-card brutal-card-teal" style={{ padding: '1rem', marginBottom: '1.5rem', fontSize: '0.85rem', fontWeight: 700 }}>
+              <p style={{ marginBottom: '0.5rem', textTransform: 'uppercase' }}>🚰 Free Sepolia Testnet Faucets for Commuters & Testers:</p>
+              <ul style={{ paddingLeft: '1.2rem', margin: 0 }}>
+                <li><a href="https://faucet.quicknode.com/drip" target="_blank" rel="noreferrer" style={{ color: '#121212' }}>QuickNode Sepolia Faucet <ExternalLink size={12} /></a></li>
+                <li><a href="https://sepoliafaucet.com" target="_blank" rel="noreferrer" style={{ color: '#121212' }}>Alchemy Sepolia Faucet <ExternalLink size={12} /></a></li>
+              </ul>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             
             {/* Step 1: Select Preset */}
@@ -127,20 +184,26 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-                  3. Note / Message to Ifeoma
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ display: 'block', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                    3. Note / Message to Ifeoma
+                  </label>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: note.length > 280 ? '#D32F2F' : '#666' }}>
+                    {note.length}/280
+                  </span>
+                </div>
                 <input
                   type="text"
                   placeholder="e.g. Thanks for saving my morning commute!"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
                   className="brutal-input"
+                  maxLength={280}
                 />
               </div>
             </div>
 
-            {/* Success / Error Banners */}
+            {/* Success Banner */}
             {txSuccessMsg && (
               <div className="brutal-card brutal-card-teal" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
                 <CheckCircle2 size={24} />
@@ -148,6 +211,15 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
               </div>
             )}
 
+            {/* Test Case 8: Prompt Rejection Specific Branch Banner */}
+            {promptRejectedMsg && (
+              <div className="brutal-card brutal-card-yellow" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
+                <AlertTriangle size={24} color="#D32F2F" />
+                <div>{promptRejectedMsg}</div>
+              </div>
+            )}
+
+            {/* General Error Banner */}
             {txErrorMsg && (
               <div className="brutal-card brutal-card-coral" style={{ padding: '1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700 }}>
                 <AlertCircle size={24} />
@@ -163,21 +235,34 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
                 <span>Recipient Wallet: <code>0x7099...79C8</code> (Ifeoma's Direct Address)</span>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="brutal-btn brutal-btn-blue"
-                style={{ fontSize: '1.05rem', padding: '0.85rem 2rem' }}
-              >
-                {isSubmitting ? (
-                  <span>Processing Web3 Tx...</span>
-                ) : (
-                  <>
-                    <Send size={18} />
-                    <span>Send {selectedPreset === 'custom' ? (customAmount || '0') : selectedPreset} ETH Tip</span>
-                  </>
-                )}
-              </button>
+              {walletAddress ? (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || isWrongNetwork}
+                  className="brutal-btn brutal-btn-blue"
+                  style={{ fontSize: '1.05rem', padding: '0.85rem 2rem', opacity: isWrongNetwork ? 0.6 : 1 }}
+                >
+                  {isSubmitting ? (
+                    <span>Processing Web3 Tx...</span>
+                  ) : isWrongNetwork ? (
+                    <span>Switch Network to Send Tip</span>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      <span>Send {selectedPreset === 'custom' ? (customAmount || '0') : selectedPreset} ETH Tip</span>
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onConnectWallet}
+                  className="brutal-btn brutal-btn-yellow"
+                  style={{ fontSize: '1.05rem', padding: '0.85rem 2rem' }}
+                >
+                  Connect Wallet to Send Tip
+                </button>
+              )}
 
             </div>
 
@@ -190,3 +275,4 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
     </section>
   );
 }
+
