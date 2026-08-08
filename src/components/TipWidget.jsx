@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, CheckCircle2, AlertCircle, Coins, AlertTriangle, ExternalLink, HelpCircle } from 'lucide-react';
+import deploymentData from '../contracts/deployment.json';
 
 export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onConnectWallet, chainId, onSwitchNetwork }) {
   const [selectedPreset, setSelectedPreset] = useState('0.005');
@@ -10,6 +11,10 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
   const [txErrorMsg, setTxErrorMsg] = useState(null);
   const [promptRejectedMsg, setPromptRejectedMsg] = useState(null);
   const [showFaucetHelp, setShowFaucetHelp] = useState(false);
+
+  const beneficiaryAddr = deploymentData?.beneficiary || "0x720C021b221347220A4F1Fa38ed21b0593fc69CC";
+  const formattedBeneficiary = `${beneficiaryAddr.substring(0, 6)}...${beneficiaryAddr.substring(beneficiaryAddr.length - 4)}`;
+
 
   const presets = [
     { eth: '0.001', label: '0.001 ETH', desc: '☕ Quick Coffee Tip (~$3)' },
@@ -232,7 +237,7 @@ export default function TipWidget({ onSendTip, isSubmitting, walletAddress, onCo
               
               <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Coins size={18} />
-                <span>Recipient Wallet: <code>0x7099...79C8</code> (Ifeoma's Direct Address)</span>
+                <span>Recipient Wallet: <code>{formattedBeneficiary}</code> (Ifeoma's Direct Address)</span>
               </div>
 
               {walletAddress ? (
